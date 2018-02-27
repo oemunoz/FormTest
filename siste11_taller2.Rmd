@@ -1,0 +1,200 @@
+---
+title: "Review product from online markets over fuzzy logic in R"
+author: "SISTE11 group, Juan Felipe, Leidy, @[oemunoz](http://siste11.gitlab.io)"
+output: html_document
+---
+
+## Introduction
+***
+
+The emergence of online markets, has changed the way of interacting with suppliers of different products. More and more, the online shopping method is imposed as everything to supply the particular needs. However, although online shopping is part of a computer system, there are always alternatives to purchase different products, we want to analyze the decisions that are made about where, when and how these products are purchased. We will try to determine the parameters that experts use to perform this type of process, as well as the ways to qualify these activities and in general acquire and translate into an expert system all this information, to achieve this goal we will use and analyze methods such as Delphy among others.
+
+In this research we will use the package "sets" for creating the fuzzy system.
+For more information about "sets", check out the official documentation at https://cran.r-project.org/web/packages/sets/sets.pdf
+
+## Set up a simple fuzzy system
+***
+
+The first step in creating a fuzzy system using 'sets' is to set the range of the
+system. The range is a boundary in which all values should belong.
+
+```{r}
+if(!require("knitr")) install.packages("knitr", repos="http://cran.us.r-project.org")
+if(!require("sets")) install.packages("sets", repos="http://cran.us.r-project.org")
+if(!require("gsheet")) install.packages("gsheet", repos="http://cran.us.r-project.org")
+survey <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1CJyDAx4lYVFDZDaSpwub74PcP_Dli1j_AUNhMIVDLO9')
+
+library(sets)
+sets_options("universe", seq(1, 100, 0.5))
+summary(survey)
+```
+
+## The variables
+***
+
+The next step is to define the variables of the fuzzy system.
+
+For this fuzzy system, which is produc-related, the variables we chose are 'Quality', 'Seller' and 'Price'. So, as mentioned before, the state of the product (bad, ok or perfect), will be determined according to this variables.
+
+* Quality
+* Seller
+* Price
+
+```{r}
+variables <- set(
+  quality = fuzzy_partition(varnames = c(cold = 30, good = 70, hot = 90),
+                                sd = 5.0),
+  seller = fuzzy_partition(varnames = c(dry = 30, good = 60, wet = 80), 
+                             sd = 3.0),
+  price = fuzzy_partition(varnames = c(no.rain = 30, little.rain = 60,
+                                               rain = 90), sd = 7.5),
+  product = fuzzy_partition(varnames = c(bad = 40, ok = 65, perfect = 80),
+                            FUN = fuzzy_cone, radius = 10)
+)
+```
+
+
+You might be wondering what are those values and variables that are inside the
+parentheses. The answer is that at the time of defining the system, you need to 
+specify the attributes of the variables and give a value to them.
+For example, the first variable 'quality', has three different attributes or
+levels: 'cold', 'good' and 'hot', with the values of 30, 70 and 90. This means
+that if the quality (using Fahrenheit this time) is 30, then it is 'cold',
+if it 70, it is 'good' and if it is 90, it is 'hot'. For the variables 'seller' and
+'price' you could read it as "if the seller percentage is 30, then it
+is dry" or "there's a 60% chance that it will rain today".
+
+The last variable 'product' is the responsible of defining the state of the system.
+We will see more of this at the end.
+
+## The fuzzy rules
+***
+
+Once the variables are defined, the next step is to define the fuzzy rules of
+the system. In the previous section, I showed a variable called 'product' that 
+is the final state or the response of the system. The fuzzy rules are the links
+between the "non-final" variables (quality, seller and price) and
+'product'.
+
+```{r}
+# Fuzzy rules
+rules <- set(
+  fuzzy_rule(quality %is% good && seller %is% dry &&
+               price %is% no.rain, product %is% perfect),
+  fuzzy_rule(quality %is% hot && seller %is% wet &&
+               price %is% rain, product %is% bad),
+  fuzzy_rule(quality %is% cold, product %is% bad),
+  fuzzy_rule(quality %is% good || seller %is% good ||
+               price %is% little.rain, product %is% ok),
+  fuzzy_rule(quality %is% hot && price %is% little.rain,
+             product %is% ok),
+  fuzzy_rule(quality %is% hot && seller %is% dry &&
+               price %is% little.rain, product %is% ok)
+)
+```
+
+For this system, six rules were defined.
+
+* If the quality is 'good' (refer to the variables to see what 'good' is), 
+the seller is 'dry' and the price is 'no.rain', then the product is 
+'perfect'. 
+* If the quality is 'hot', seller is 'wet' and price is 'rain', 
+then the product is 'bad'.
+* If the quality is 'cold', then the product is 'bad'.
+* If the quality is 'good' or the seller is 'good' or the price is
+'little.rain', then the product is 'ok'.
+* If the quality is 'hot' and the price is 'little.rain', then the
+product is 'ok'.
+* If the quality is 'hot', the seller is 'dry' and price is
+'little.rain', then the product is 'ok'.
+
+Note the && and ||.
+
+Now, let's build the system.
+
+## The system
+***
+
+```{r}
+model <- fuzzy_system(variables, rules)
+```
+
+The variables and rules of the system.
+
+```{r}
+print(model)
+```
+
+This is the plot of the system.
+
+```{r}
+plot(model)
+```
+
+As you can see, some of the plots present overlapping between the properties
+of the variables. For example, in the quality plot, there is overlapping 
+between 'good' and 'hot', so if the quality is 80, then it is around 0.15 'good',
+0.15 'hot' and 0.0 'cold'.
+
+## Examples
+***
+
+These are some examples done to test the system.
+
+#### Temperature = 75, seller = 0 and price = 70
+
+```{r}
+example.1 <- fuzzy_inference(model, list(quality = 75, seller = 0,
+                                       price = 70))
+
+```
+
+Now, we defuzzify the example to transform the parameters into an actual number.
+
+```{r}
+gset_defuzzify(example.1, "centroid")
+```
+
+
+```{r}
+plot(example.1)
+```
+
+So, according to the system, the product is 0.6 ok (see the product plot)
+
+#### Temperature = 30, seller = 0 and price = 70
+
+The next example, is very similar to the previous one. The only difference is the
+quality parameter, which now is 30. What do you think is going to happen?
+
+```{r}
+example.2 <- fuzzy_inference(model, list(quality = 30, seller = 0,
+                                       price = 70))
+gset_defuzzify(example.2, "largestofmax")
+plot(example.2)
+sets_options("universe", NULL)  # Reset the universe
+```
+
+By lowering the quality, the model lowers the amount of 'ok' product to
+around 0.4 and creates a new ?smoothpeak with global maxima at 40, meaning that
+the product is 1.0 'bad'. 
+
+I did a little cheating to get this result. If you look at the variables and the
+rules, you can see that a quality of 30 is 'cold' and that there is a rule 
+stating that if the quality is 'cold', then the product is 'bad'.
+
+## Closure
+***
+
+In this tutorial, I introduced the basic of fuzzy logic and presented an example
+using R. If you are interested in learning more about this topic and how to
+apply it using R, I recommend the official documentation of the 'sets' package
+linked at the beginning. Also, the Wikipedia page about fuzzy logic is pretty good (https://en.wikipedia.org/wiki/Fuzzy_logic).
+
+## Notes
+***
+
+* If you spot a typo, or any error in the report, please let me know so I can
+fix it.
+* This work is licensed under a [Creative Commons Attribution-NonCommercial 4.0 International License](http://creativecommons.org/licenses/by-nc/4.0/). In other words, feel 
+free to use it, share it, edit it for non-commercial purposes and please, give credit.
