@@ -1,6 +1,6 @@
 ---
 title: "Review product from online markets over fuzzy logic in R"
-author: "SISTE11 group, Juan Felipe, Leidy, @[oemunoz](http://siste11.gitlab.io)"
+author: "SISTE11 group, Juan Felipe, Leidy Bravo, @[oemunoz](http://siste11.gitlab.io)"
 output: html_document
 ---
 
@@ -22,11 +22,10 @@ system. The range is a boundary in which all values should belong.
 if(!require("knitr")) install.packages("knitr", repos="http://cran.us.r-project.org")
 if(!require("sets")) install.packages("sets", repos="http://cran.us.r-project.org")
 if(!require("gsheet")) install.packages("gsheet", repos="http://cran.us.r-project.org")
-survey <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1CJyDAx4lYVFDZDaSpwub74PcP_Dli1j_AUNhMIVDLO9')
-
+if(!require("plyr")) install.packages("plyr", repos="http://cran.us.r-project.org")
+library(plyr)
 library(sets)
 sets_options("universe", seq(1, 100, 0.5))
-summary(survey)
 ```
 
 ## The variables
@@ -41,6 +40,43 @@ For this fuzzy system, which is produc-related, the variables we chose are 'Qual
 * Price
 
 ```{r}
+survey <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1CJyDAx4lYVFDZDaSpwub74PcP_Dli1j_AUNhMIVDLO9')
+summary(survey)
+colnames(survey)<- c("time","seller","price","quality")
+kable(survey)
+```
+
+Price:
+```{r}
+d_price <- count(survey, "price" )
+
+subset(d_price, price == "Adsequible")$freq
+subset(d_price, price == "Costoso")$freq
+subset(d_price, price == "Justo")$freq
+
+nrow(survey)
+
+kable( count(survey, "price") )
+```
+
+Quality:
+```{r}
+d_quality <- count(survey, "quality" )
+summary(d_quality)
+
+kable( count(survey, "quality") )
+```
+
+Seller:
+```{r}
+d_seller <- count(survey, "seller" )
+
+kable( count(survey, "seller") )
+```
+
+Charge vars:
+
+```{r}
 variables <- set(
   quality = fuzzy_partition(varnames = c(cold = 30, good = 70, hot = 90),
                                 sd = 5.0),
@@ -52,7 +88,6 @@ variables <- set(
                             FUN = fuzzy_cone, radius = 10)
 )
 ```
-
 
 You might be wondering what are those values and variables that are inside the
 parentheses. The answer is that at the time of defining the system, you need to 
