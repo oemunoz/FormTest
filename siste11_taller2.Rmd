@@ -25,6 +25,7 @@ if(!require("gsheet")) install.packages("gsheet", repos="http://cran.us.r-projec
 if(!require("plyr")) install.packages("plyr", repos="http://cran.us.r-project.org")
 library(plyr)
 library(sets)
+library(gsheet)
 sets_options("universe", seq(1, 100, 0.5))
 ```
 
